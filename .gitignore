@@ -1,0 +1,19 @@
+# Uniquement ce qui se régénère (évite un push de ~350 Mo)
+node_modules/
+**/node_modules/
+
+# Builds (npm run build)
+dist/
+**/dist/
+build/
+.turbo/
+.vite/
+coverage/
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Gros archives temporaires (pas les .env)
+*.zip

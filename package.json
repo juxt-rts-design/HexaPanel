@@ -1,0 +1,25 @@
+{
+  "name": "hexapanel",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @hexapanel/panel-api",
+    "dev:web": "npm run dev -w @hexapanel/panel-web",
+    "build": "npm run build -w @hexapanel/shared && npm run build -w @hexapanel/panel-api && npm run build -w @hexapanel/panel-web",
+    "start:api": "npm run start -w @hexapanel/panel-api",
+    "db:generate": "npm run db:generate -w @hexapanel/panel-api",
+    "db:push": "npm run db:push -w @hexapanel/panel-api",
+    "db:seed": "npm run db:seed -w @hexapanel/panel-api"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

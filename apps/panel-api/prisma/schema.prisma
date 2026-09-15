@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("user")
+  createdAt    DateTime @default(now())
+  apps         App[]
+}
+
+model App {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String      @unique
+  sourceType    String
+  sourceUrl     String?
+  runtime       String      @default("auto")
+  port          Int?
+  status        String      @default("pending")
+  domain        String
+  rootPath      String
+  startCommand  String?
+  buildCommand  String?
+  envJson       String      @default("{}")
+  lastError     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  logs          DeployLog[]
+}
+
+model DeployLog {
+  id        String   @id @default(cuid())
+  appId     String
+  app       App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  lines     String
+  createdAt DateTime @default(now())
+}
+
+model PortLease {
+  port      Int      @id
+  appId     String   @unique
+  createdAt DateTime @default(now())
+}
