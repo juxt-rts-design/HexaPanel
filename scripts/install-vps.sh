@@ -55,12 +55,12 @@ mkdir -p "$ROOT/data" "$ROOT/apps-data" "$ROOT/data/uploads"
 cat > "$ROOT/apps/panel-api/.env" <<EOF
 PORT=4040
 HOST=127.0.0.1
-DATABASE_URL="file:../../../data/hexapanel.db"
+DATABASE_URL="file:$ROOT/data/hexapanel.db"
 JWT_SECRET=$JWT_SECRET
 JWT_EXPIRES_IN=7d
 VPS_IP=$VPS_IP
-APPS_ROOT=../../../apps-data
-UPLOADS_ROOT=../../../data/uploads
+APPS_ROOT=$ROOT/apps-data
+UPLOADS_ROOT=$ROOT/data/uploads
 PORT_RANGE_START=5100
 PORT_RANGE_END=5999
 MAX_ZIP_MB=100
@@ -70,6 +70,9 @@ PANEL_WEB_ORIGIN=https://$PANEL_DOMAIN
 ADMIN_EMAIL=$ADMIN_EMAIL
 ADMIN_PASSWORD=$ADMIN_PASSWORD
 EOF
+
+sudo mkdir -p /var/www/hexapanel
+sudo chown -R www-data:www-data /var/www/hexapanel || true
 
 npm install
 npm run build -w @hexapanel/shared

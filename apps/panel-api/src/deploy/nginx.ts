@@ -4,6 +4,38 @@ import path from "node:path";
 import { config } from "../config.js";
 import { runCommand } from "./shell.js";
 
+function shQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Publie un site static sous /var/www pour que nginx (www-data) puisse le lire. */
+export async function publishStaticSite(
+  slug: string,
+  sourceRoot: string,
+): Promise<string> {
+  const dest = path.posix.join("/var/www/hexapanel", slug);
+  if (config.deployDryRun) {
+    return sourceRoot;
+  }
+  await runCommand(`sudo mkdir -p ${shQuote(dest)}`, process.cwd(), {});
+  await runCommand(
+    `sudo rsync -a --delete ${shQuote(sourceRoot + "/")} ${shQuote(dest + "/")}`,
+    process.cwd(),
+    {},
+  );
+  await runCommand(
+    `sudo chown -R www-data:www-data ${shQuote(dest)}`,
+    process.cwd(),
+    {},
+  );
+  await runCommand(
+    `sudo find ${shQuote(dest)} -type d -exec chmod 755 {} +; sudo find ${shQuote(dest)} -type f -exec chmod 644 {} +`,
+    process.cwd(),
+    {},
+  );
+  return dest;
+}
+
 export async function writeNginxConfig(opts: {
   slug: string;
   domain: string;
@@ -19,7 +51,7 @@ export async function writeNginxConfig(opts: {
   if (opts.runtime === "static" && opts.staticRoot) {
     locationBlock = `
     root ${opts.staticRoot};
-    index index.html;
+    index index.html index.htm;
     location / {
         try_files $uri $uri/ /index.html;
     }`;
@@ -57,8 +89,8 @@ ${locationBlock}
 
   const tmp = path.join(os.tmpdir(), `${confName}.conf`);
   await fs.writeFile(tmp, content, "utf8");
-  await runCommand(`sudo cp ${tmp} ${available}`, process.cwd(), {});
-  await runCommand(`sudo ln -sfn ${available} ${enabled}`, process.cwd(), {});
+  await runCommand(`sudo cp ${shQuote(tmp)} ${shQuote(available)}`, process.cwd(), {});
+  await runCommand(`sudo ln -sfn ${shQuote(available)} ${shQuote(enabled)}`, process.cwd(), {});
   await runCommand("sudo nginx -t && sudo systemctl reload nginx", process.cwd(), {});
   await fs.rm(tmp, { force: true });
   return available;
@@ -67,7 +99,7 @@ ${locationBlock}
 export async function ensureHttps(domain: string): Promise<void> {
   if (config.deployDryRun) return;
   await runCommand(
-    `sudo certbot --nginx --agree-tos --register-unsafely-without-email -d ${domain} --non-interactive --redirect`,
+    `sudo certbot --nginx --agree-tos --register-unsafely-without-email -d ${shQuote(domain)} --non-interactive --redirect`,
     process.cwd(),
     {},
   );
@@ -82,7 +114,7 @@ export async function removeNginxConfig(slug: string): Promise<void> {
     return;
   }
   await runCommand(
-    `sudo rm -f /etc/nginx/sites-enabled/${confName} /etc/nginx/sites-available/${confName} && sudo nginx -t && sudo systemctl reload nginx || true`,
+    `sudo rm -f /etc/nginx/sites-enabled/${confName} /etc/nginx/sites-available/${confName}; sudo rm -rf /var/www/hexapanel/${slug}; sudo nginx -t && sudo systemctl reload nginx || true`,
     process.cwd(),
     {},
   );

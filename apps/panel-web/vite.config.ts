@@ -13,6 +13,9 @@ export default defineConfig({
     },
   },
   preview: {
+    host: "127.0.0.1",
     port: 4173,
+    // nginx reverse-proxy envoie Host: panel.*.sslip.io
+    allowedHosts: true,
   },
 });

@@ -7,7 +7,7 @@ import { config } from "../config.js";
 import { detectRuntime, resolveStaticRoot } from "./detect.js";
 import { allocatePort, releasePort } from "./ports.js";
 import { runCommand } from "./shell.js";
-import { ensureHttps, removeNginxConfig, writeNginxConfig } from "./nginx.js";
+import { ensureHttps, publishStaticSite, removeNginxConfig, writeNginxConfig } from "./nginx.js";
 import {
   deletePm2Process,
   startPm2Process,
@@ -192,8 +192,10 @@ export async function deployApp(
 
     let staticRoot: string | null = null;
     if (finalRuntime.runtime === "static") {
-      staticRoot = resolveStaticRoot(root, finalRuntime.staticRoot);
-      await log(`Static root: ${staticRoot}`);
+      const detectedRoot = resolveStaticRoot(root, finalRuntime.staticRoot);
+      await log(`Static source: ${detectedRoot}`);
+      staticRoot = await publishStaticSite(app.slug, detectedRoot);
+      await log(`Static publié pour nginx: ${staticRoot}`);
       await deletePm2Process(app.id);
     } else {
       if (!port || !finalRuntime.startCommand) {

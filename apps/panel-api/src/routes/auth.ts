@@ -9,17 +9,22 @@ import {
   type AuthedRequest,
 } from "../middleware/auth.js";
 
-const credentialsSchema = z.object({
+const loginSchema = z.object({
   email: z.string().email().max(200),
-  password: z.string().min(8).max(200),
+  password: z.string().min(1).max(200),
+});
+
+const registerSchema = z.object({
+  email: z.string().email().max(200),
+  password: z.string().min(6).max(200),
 });
 
 export const authRouter = Router();
 
 authRouter.post("/register", async (req, res) => {
-  const parsed = credentialsSchema.safeParse(req.body);
+  const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Email ou mot de passe invalide" });
+    res.status(400).json({ error: "Email ou mot de passe invalide (min. 6 caractères)" });
     return;
   }
 
@@ -50,7 +55,7 @@ authRouter.post("/register", async (req, res) => {
 });
 
 authRouter.post("/login", async (req, res) => {
-  const parsed = credentialsSchema.safeParse(req.body);
+  const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Email ou mot de passe invalide" });
     return;
