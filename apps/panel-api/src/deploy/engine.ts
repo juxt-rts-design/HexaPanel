@@ -7,7 +7,14 @@ import { config } from "../config.js";
 import { detectRuntime, resolveStaticRoot } from "./detect.js";
 import { allocatePort, releasePort } from "./ports.js";
 import { runCommand } from "./shell.js";
-import { ensureHttps, publishStaticSite, removeNginxConfig, writeNginxConfig } from "./nginx.js";
+import {
+  disableNginxSite,
+  enableNginxSite,
+  ensureHttps,
+  publishStaticSite,
+  removeNginxConfig,
+  writeNginxConfig,
+} from "./nginx.js";
 import {
   deletePm2Process,
   startPm2Process,
@@ -254,7 +261,10 @@ export async function deployApp(
 }
 
 export async function stopApp(appId: string): Promise<void> {
+  const app = await prisma.app.findUnique({ where: { id: appId } });
+  if (!app) throw new Error("App introuvable");
   await stopPm2Process(appId);
+  await disableNginxSite(app.slug);
   await prisma.app.update({
     where: { id: appId },
     data: { status: "stopped" },
@@ -265,6 +275,7 @@ export async function startApp(appId: string): Promise<void> {
   const app = await prisma.app.findUnique({ where: { id: appId } });
   if (!app) throw new Error("App introuvable");
   if (app.runtime === "static") {
+    await enableNginxSite(app.slug);
     await prisma.app.update({
       where: { id: appId },
       data: { status: "running" },
@@ -283,6 +294,7 @@ export async function startApp(appId: string): Promise<void> {
     port: app.port,
     env,
   });
+  await enableNginxSite(app.slug);
   await prisma.app.update({
     where: { id: appId },
     data: { status: "running" },
@@ -293,11 +305,14 @@ export async function destroyApp(appId: string): Promise<void> {
   const app = await prisma.app.findUnique({ where: { id: appId } });
   if (!app) return;
   await deletePm2Process(appId);
-  await removeNginxConfig(app.slug);
+  await removeNginxConfig(app.slug, app.domain);
   await releasePort(appId);
   if (app.rootPath) {
     await fs.rm(app.rootPath, { recursive: true, force: true });
   }
+  // Au cas où apps-data a bougé
+  const fallback = path.join(config.appsRoot, app.userId, app.id);
+  await fs.rm(fallback, { recursive: true, force: true });
   await prisma.app.delete({ where: { id: appId } });
 }
 

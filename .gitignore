@@ -10,10 +10,18 @@ build/
 .vite/
 coverage/
 
+# Données runtime VPS — ne jamais écraser via git pull
+data/*.db
+data/*.db-journal
+data/uploads/
+apps-data/**
+!apps-data/.gitkeep
+!data/.gitkeep
+
 # Logs / OS
 *.log
 .DS_Store
 Thumbs.db
 
-# Gros archives temporaires (pas les .env)
+# Gros archives temporaires
 *.zip

@@ -8,6 +8,10 @@ function shQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
+function confName(slug: string): string {
+  return `hexapanel-${slug}`;
+}
+
 /** Publie un site static sous /var/www pour que nginx (www-data) puisse le lire. */
 export async function publishStaticSite(
   slug: string,
@@ -43,9 +47,9 @@ export async function writeNginxConfig(opts: {
   port: number | null;
   staticRoot: string | null;
 }): Promise<string> {
-  const confName = `hexapanel-${opts.slug}`;
-  const available = `/etc/nginx/sites-available/${confName}`;
-  const enabled = `/etc/nginx/sites-enabled/${confName}`;
+  const name = confName(opts.slug);
+  const available = `/etc/nginx/sites-available/${name}`;
+  const enabled = `/etc/nginx/sites-enabled/${name}`;
 
   let locationBlock: string;
   if (opts.runtime === "static" && opts.staticRoot) {
@@ -82,12 +86,12 @@ ${locationBlock}
   if (config.deployDryRun) {
     const dryDir = path.join(config.appsRoot, ".nginx-dry");
     await fs.mkdir(dryDir, { recursive: true });
-    const dryPath = path.join(dryDir, `${confName}.conf`);
+    const dryPath = path.join(dryDir, `${name}.conf`);
     await fs.writeFile(dryPath, content, "utf8");
     return dryPath;
   }
 
-  const tmp = path.join(os.tmpdir(), `${confName}.conf`);
+  const tmp = path.join(os.tmpdir(), `${name}.conf`);
   await fs.writeFile(tmp, content, "utf8");
   await runCommand(`sudo cp ${shQuote(tmp)} ${shQuote(available)}`, process.cwd(), {});
   await runCommand(`sudo ln -sfn ${shQuote(available)} ${shQuote(enabled)}`, process.cwd(), {});
@@ -106,15 +110,61 @@ export async function ensureHttps(domain: string): Promise<void> {
   await runCommand("sudo nginx -t && sudo systemctl reload nginx", process.cwd(), {});
 }
 
-export async function removeNginxConfig(slug: string): Promise<void> {
-  const confName = `hexapanel-${slug}`;
+/** Désactive le vhost (Stop) — le site ne répond plus. */
+export async function disableNginxSite(slug: string): Promise<void> {
+  if (config.deployDryRun) return;
+  const name = confName(slug);
+  await runCommand(
+    `sudo rm -f /etc/nginx/sites-enabled/${name} && sudo nginx -t && sudo systemctl reload nginx || true`,
+    process.cwd(),
+    {},
+  );
+}
+
+/** Réactive le vhost (Start). */
+export async function enableNginxSite(slug: string): Promise<void> {
+  if (config.deployDryRun) return;
+  const name = confName(slug);
+  await runCommand(
+    `sudo ln -sfn /etc/nginx/sites-available/${name} /etc/nginx/sites-enabled/${name} && sudo nginx -t && sudo systemctl reload nginx || true`,
+    process.cwd(),
+    {},
+  );
+}
+
+/** Supprime nginx + fichiers publiés + certificat Let's Encrypt. */
+export async function removeNginxConfig(
+  slug: string,
+  domain?: string | null,
+): Promise<void> {
+  const name = confName(slug);
   if (config.deployDryRun) {
-    const dryPath = path.join(config.appsRoot, ".nginx-dry", `${confName}.conf`);
+    const dryPath = path.join(config.appsRoot, ".nginx-dry", `${name}.conf`);
     await fs.rm(dryPath, { force: true });
     return;
   }
+
   await runCommand(
-    `sudo rm -f /etc/nginx/sites-enabled/${confName} /etc/nginx/sites-available/${confName}; sudo rm -rf /var/www/hexapanel/${slug}; sudo nginx -t && sudo systemctl reload nginx || true`,
+    `sudo rm -f /etc/nginx/sites-enabled/${name} /etc/nginx/sites-available/${name}`,
+    process.cwd(),
+    {},
+  );
+  await runCommand(
+    `sudo rm -rf /var/www/hexapanel/${slug}`,
+    process.cwd(),
+    {},
+  );
+
+  if (domain) {
+    await runCommand(
+      `sudo certbot delete --cert-name ${shQuote(domain)} --non-interactive || true`,
+      process.cwd(),
+      {},
+    );
+  }
+
+  await runCommand(
+    "sudo nginx -t && sudo systemctl reload nginx || true",
     process.cwd(),
     {},
   );

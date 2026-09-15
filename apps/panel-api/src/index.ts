@@ -19,19 +19,14 @@ async function ensureDirs(): Promise<void> {
 }
 
 async function ensureAdmin(): Promise<void> {
-  const existing = await prisma.user.findUnique({
-    where: { email: config.adminEmail.toLowerCase() },
-  });
-  if (existing) return;
+  const email = config.adminEmail.toLowerCase();
   const passwordHash = await bcrypt.hash(config.adminPassword, 12);
-  await prisma.user.create({
-    data: {
-      email: config.adminEmail.toLowerCase(),
-      passwordHash,
-      role: "admin",
-    },
+  await prisma.user.upsert({
+    where: { email },
+    update: { passwordHash, role: "admin" },
+    create: { email, passwordHash, role: "admin" },
   });
-  console.log(`Admin créé: ${config.adminEmail}`);
+  console.log(`Admin prêt: ${email}`);
 }
 
 async function main(): Promise<void> {
